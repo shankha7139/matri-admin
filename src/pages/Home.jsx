@@ -1,49 +1,18 @@
 import React, { useState, useEffect } from "react";
 import { collection, getDocs } from "firebase/firestore";
-import {
-  db,
-  analytics,
-  logAnalyticsEvent,
-  getAnalyticsData,
-} from "../firebase";
+import { db, storage } from "../firebase";
 import { useAuth } from "../AuthContext";
 import { useNavigate } from "react-router-dom";
 import { Bar, Line, Doughnut } from "react-chartjs-2";
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  PointElement,
-  LineElement,
-  ArcElement,
-  Title,
-  Tooltip,
-  Legend,
-} from "chart.js";
-import {
-  getAnalytics,
-  logEvent,
-  getUserProperties,
-  getPerformance,
-} from "firebase/analytics";
-
-ChartJS.register(
-  CategoryScale,
-  LinearScale,
-  BarElement,
-  PointElement,
-  LineElement,
-  ArcElement,
-  Title,
-  Tooltip,
-  Legend
-);
+import { doc, getDoc } from "firebase/firestore";
+import { getDownloadURL, ref, listAll } from "firebase/storage";
 
 export default function AdminDashboard() {
   const [users, setUsers] = useState([]);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [analyticsData, setAnalyticsData] = useState(null);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [userPhotos, setUserPhotos] = useState([]);
   const auth = useAuth();
   const navigate = useNavigate();
 
@@ -63,6 +32,32 @@ export default function AdminDashboard() {
   const handleLogout = () => {
     auth.logout();
     navigate("/login");
+  };
+
+  const handleUserClick = async (userId) => {
+    const userRef = doc(db, "users", userId);
+    const userSnap = await getDoc(userRef);
+
+    if (userSnap.exists()) {
+      setSelectedUser(userSnap.data());
+      fetchUserPhotos(userId);
+      setIsModalOpen(true);
+    }
+  };
+
+  const fetchUserPhotos = async (userId) => {
+    const photosRef = ref(storage, `users/${userId}/photos`);
+    const photosList = await listAll(photosRef);
+    const photoUrls = await Promise.all(
+      photosList.items.map((item) => getDownloadURL(item))
+    );
+    setUserPhotos(photoUrls);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setSelectedUser(null);
+    setUserPhotos([]);
   };
 
   return (
@@ -92,7 +87,7 @@ export default function AdminDashboard() {
       <div
         className={`${
           isMobileMenuOpen ? "block" : "hidden"
-        } lg:block lg:w-64 bg-indigo-800 text-white p-6`}
+        } lg:block lg:w-64 bg-gradient-to-br from-indigo-100 to-[#F39C3E] text-white p-6`}
       >
         <h2 className="text-2xl font-semibold mb-6 hidden lg:block">
           Admin Dashboard
@@ -145,7 +140,11 @@ export default function AdminDashboard() {
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
                   {users.map((user) => (
-                    <tr key={user.id} className="hover:bg-orange-50">
+                    <tr
+                      key={user.id}
+                      className="hover:bg-orange-50"
+                      onClick={() => handleUserClick(user.id)}
+                    >
                       <td className="px-4 py-4 whitespace-nowrap text-sm lg:px-6">
                         {user.name != "" ? <>{user.name}</> : "No Name"}
                       </td>
@@ -165,6 +164,151 @@ export default function AdminDashboard() {
           </div>
         </main>
       </div>
+
+      {isModalOpen && selectedUser && (
+        <div className="fixed inset-0 bg-gray-600 bg-opacity-75 overflow-y-auto h-full w-full z-50 flex items-center justify-center p-4">
+          <div className="relative w-full max-w-4xl bg-white rounded-lg shadow-xl overflow-hidden">
+            <div className="absolute top-0 right-0 pt-4 pr-4">
+              <button
+                onClick={closeModal}
+                className="text-gray-400 hover:text-gray-500 focus:outline-none focus:text-gray-500 transition ease-in-out duration-150"
+              >
+                <svg
+                  className="h-6 w-6"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor"
+                >
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth="2"
+                    d="M6 18L18 6M6 6l12 12"
+                  />
+                </svg>
+              </button>
+            </div>
+
+            <div className="bg-gradient-to-r from-purple-600 to-indigo-600 px-6 py-4">
+              <h3 className="text-2xl font-bold text-white">
+                {selectedUser.name}'s Profile
+              </h3>
+            </div>
+
+            <div className="px-6 py-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <h4 className="text-lg font-semibold text-gray-700 mb-2">
+                    Personal Information
+                  </h4>
+                  <div className="space-y-2">
+                    <p>
+                      <span className="font-medium text-gray-600">Age:</span>{" "}
+                      {selectedUser.age}
+                    </p>
+                    <p>
+                      <span className="font-medium text-gray-600">Sex:</span>{" "}
+                      {selectedUser.sex}
+                    </p>
+                    <p>
+                      <span className="font-medium text-gray-600">
+                        Date of Birth:
+                      </span>{" "}
+                      {selectedUser.dateOfBirth}
+                    </p>
+                    <p>
+                      <span className="font-medium text-gray-600">
+                        Mother Tongue:
+                      </span>{" "}
+                      {selectedUser.motherTongue}
+                    </p>
+                    <p>
+                      <span className="font-medium text-gray-600">
+                        Religion:
+                      </span>{" "}
+                      {selectedUser.religion}
+                    </p>
+                  </div>
+                </div>
+                <div>
+                  <h4 className="text-lg font-semibold text-gray-700 mb-2">
+                    Contact Details
+                  </h4>
+                  <div className="space-y-2">
+                    <p>
+                      <span className="font-medium text-gray-600">Email:</span>{" "}
+                      {selectedUser.email}
+                    </p>
+                    <p>
+                      <span className="font-medium text-gray-600">Phone:</span>{" "}
+                      {selectedUser.number}
+                    </p>
+                    <p>
+                      <span className="font-medium text-gray-600">
+                        Address:
+                      </span>{" "}
+                      {selectedUser.address}
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-6">
+                <h4 className="text-lg font-semibold text-gray-700 mb-2">
+                  Professional Information
+                </h4>
+                <div className="space-y-2">
+                  <p>
+                    <span className="font-medium text-gray-600">
+                      Profession:
+                    </span>{" "}
+                    {selectedUser.profession}
+                  </p>
+                  <p>
+                    <span className="font-medium text-gray-600">
+                      Employment Status:
+                    </span>{" "}
+                    {selectedUser.employmentStatus}
+                  </p>
+                  <p>
+                    <span className="font-medium text-gray-600">Salary:</span>{" "}
+                    {selectedUser.salary}
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-6">
+                <h4 className="text-lg font-semibold text-gray-700 mb-2">
+                  Description
+                </h4>
+                <p className="text-gray-600">{selectedUser.description}</p>
+              </div>
+            </div>
+
+            <div className="bg-gray-50 px-6 py-4">
+              <h4 className="text-lg font-semibold text-gray-700 mb-4">
+                Photos
+              </h4>
+              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                {userPhotos.map((photoUrl, index) => (
+                  <div key={index} className="relative group">
+                    <img
+                      src={photoUrl}
+                      alt={`User photo ${index + 1}`}
+                      className="w-full h-40 object-cover rounded-lg shadow-md transition duration-300 ease-in-out transform group-hover:scale-105"
+                    />
+                    <div className="absolute inset-0 bg-black bg-opacity-50 opacity-0 group-hover:opacity-100 transition duration-300 ease-in-out rounded-lg flex items-center justify-center">
+                      <button className="text-white bg-blue-600 hover:bg-blue-700 font-bold py-2 px-4 rounded">
+                        View
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getFirestore } from "firebase/firestore";
 import { getAnalytics, logEvent, setUserProperties } from "firebase/analytics";
+import { getStorage } from "firebase/storage";
 
 const firebaseConfig = {
   apiKey: "AIzaSyCUqEZklvL_n9rwZ2v78vxXWVv6z_2ALUE",
@@ -15,43 +16,7 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 const analytics = getAnalytics(app);
+const storage = getStorage(app);
 
-const logAnalyticsEvent = (eventName, eventParams = {}) => {
-  logEvent(analytics, eventName, eventParams);
-};
 
-const setAnalyticsUserProperties = (properties) => {
-  setUserProperties(analytics, properties);
-};
-
-const getAnalyticsData = async (metricName, options = {}) => {
-  // This is a placeholder function. In a real-world scenario,
-  // you would typically call a backend API here that has access
-  // to your Firebase Analytics data.
-  return new Promise((resolve) => {
-    setTimeout(() => {
-      switch (metricName) {
-        case "activeUsers":
-          resolve(Math.floor(Math.random() * 1000));
-        case "userEngagement":
-          resolve(
-            Array.from({ length: 7 }, () => Math.floor(Math.random() * 100))
-          );
-        case "eventCounts":
-          resolve(
-            Array.from({ length: 6 }, () => Math.floor(Math.random() * 1000))
-          );
-        default:
-          resolve(null);
-      }
-    }, 1000);
-  });
-};
-
-export {
-  db,
-  analytics,
-  logAnalyticsEvent,
-  setAnalyticsUserProperties,
-  getAnalyticsData,
-};
+export { db, analytics, storage };
