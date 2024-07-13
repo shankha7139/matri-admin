@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from "react";
-import { collection, getDocs } from "firebase/firestore";
-import { db, storage } from "../firebase";
+import { collection, getDocs, query, where } from "firebase/firestore";
+import { db } from "../firebase";
 import { useAuth } from "../AuthContext";
 import { useNavigate } from "react-router-dom";
-import { Bar, Line, Doughnut } from "react-chartjs-2";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
-import { getDownloadURL, ref, listAll } from "firebase/storage";
 import { motion } from "framer-motion";
 import {
   FaUser,
@@ -16,28 +14,26 @@ import {
   FaDollarSign,
 } from "react-icons/fa";
 
-export default function AdminDashboard() {
-  const [users, setUsers] = useState([]);
+export default function Report() {
+  const [reportedUsers, setReportedUsers] = useState([]);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState({});
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [userPhotos, setUserPhotos] = useState([]);
-  const [isConfirmationOpen, setIsConfirmationOpen] = useState(false);
   const auth = useAuth();
-  const { user, logout } = useAuth();
   const navigate = useNavigate();
 
   useEffect(() => {
-    const fetchUsers = async () => {
-      const querySnapshot = await getDocs(collection(db, "users"));
+    const fetchReportedUsers = async () => {
+      const q = query(collection(db, "users"), where("reported", "==", true));
+      const querySnapshot = await getDocs(q);
       const userData = querySnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
       }));
-      setUsers(userData);
+      setReportedUsers(userData);
     };
 
-    fetchUsers();
+    fetchReportedUsers();
   }, []);
 
   const handleLogout = () => {
@@ -45,45 +41,38 @@ export default function AdminDashboard() {
     navigate("/login");
   };
 
-  const handleVerify = async () => {
-    console.log("in the function", selectedUser);
-    if (selectedUser && selectedUser.uid) {
-      try {
-        console.log("in here");
-        const userRef = doc(db, "users", selectedUser.uid);
-        await updateDoc(userRef, {
-          verifiedByAdmin: true,
-        });
-
-        setSelectedUser({ ...selectedUser, verifiedByAdmin: true });
-        setIsConfirmationOpen(false);
-        console.log("in here user", selectedUser);
-        // You might want to update the users list here as well
-      } catch (error) {
-        console.error("Error verifying user:", error);
-      }
-    }
-  };
-
   const handleUserClick = async (userId) => {
     const userRef = doc(db, "users", userId);
     const userSnap = await getDoc(userRef);
 
     if (userSnap.exists()) {
-      setSelectedUser((prevState) => {
-        console.log("Updating selectedUser:", userSnap.data());
-        return userSnap.data();
-      });
-      //   fetchUserPhotos(userId);
+      setSelectedUser(userSnap.data());
       setIsModalOpen(true);
     }
-    console.log("selected user -------", selectedUser, userId, userSnap.data());
   };
 
   const closeModal = () => {
     setIsModalOpen(false);
     setSelectedUser(null);
-    setUserPhotos([]);
+  };
+
+  const handleClearReport = async () => {
+    if (selectedUser && selectedUser.uid) {
+      try {
+        const userRef = doc(db, "users", selectedUser.uid);
+        await updateDoc(userRef, {
+          reported: false,
+        });
+
+        setSelectedUser({ ...selectedUser, reported: false });
+        setReportedUsers(
+          reportedUsers.filter((user) => user.id !== selectedUser.uid)
+        );
+        closeModal();
+      } catch (error) {
+        console.error("Error clearing report:", error);
+      }
+    }
   };
 
   const InfoItem = ({ icon, label, value }) => (
@@ -98,47 +87,6 @@ export default function AdminDashboard() {
     </div>
   );
 
-  const ConfirmationModal = ({ onConfirm, onCancel }) => (
-    <motion.div
-      initial={{ opacity: 0, scale: 0.9 }}
-      animate={{ opacity: 1, scale: 1 }}
-      exit={{ opacity: 0, scale: 0.9 }}
-      className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-70"
-    >
-      <motion.div
-        initial={{ y: 50, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        exit={{ y: 50, opacity: 0 }}
-        className="bg-white dark:bg-gray-800 p-8 rounded-2xl shadow-2xl max-w-md w-full"
-      >
-        <h3 className="text-2xl font-bold text-gray-800 dark:text-white mb-4">
-          Confirm Verification
-        </h3>
-        <p className="text-gray-600 dark:text-gray-300 mb-6">
-          Are you sure you want to verify this user?
-        </p>
-        <div className="flex justify-end space-x-4">
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={onCancel}
-            className="px-4 py-2 bg-gray-300 text-gray-800 rounded-full hover:bg-gray-400 transition-colors duration-300"
-          >
-            Cancel
-          </motion.button>
-          <motion.button
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={onConfirm}
-            className="px-4 py-2 bg-blue-500 text-white rounded-full hover:bg-blue-600 transition-colors duration-300"
-          >
-            Confirm
-          </motion.button>
-        </div>
-      </motion.div>
-    </motion.div>
-  );
-
   return (
     <div className="flex flex-col h-screen bg-gray-100 lg:flex-row">
       <motion.header
@@ -147,7 +95,7 @@ export default function AdminDashboard() {
         animate={{ y: 0 }}
         transition={{ type: "spring", stiffness: 120 }}
       >
-        <h1 className="text-xl font-semibold">Admin Dashboard</h1>
+        <h1 className="text-xl font-semibold">Reported Users</h1>
         <button
           onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
           className="text-white focus:outline-none"
@@ -187,18 +135,17 @@ export default function AdminDashboard() {
               className="block py-2 px-4 rounded-lg text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 transition-colors duration-200"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              onClick={() => navigate("/reportedusers")}
+              onClick={() => navigate("/dashboard")}
             >
-              Reported Users
+              All Users
             </motion.a>
             <motion.a
               href="#"
               className="block py-2 px-4 rounded-lg text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 transition-colors duration-200"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
-              onClick={() => navigate("/reportedusers")}
             >
-              setings
+              Settings
             </motion.a>
             <motion.button
               onClick={handleLogout}
@@ -221,7 +168,7 @@ export default function AdminDashboard() {
           transition={{ delay: 0.2 }}
         >
           <h1 className="text-2xl font-semibold text-gray-800">
-            Dashboard Overview
+            Reported Users
           </h1>
         </motion.header>
 
@@ -233,13 +180,13 @@ export default function AdminDashboard() {
             transition={{ delay: 0.4 }}
           >
             <h3 className="text-lg font-semibold p-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white">
-              Recent Users
+              Reported Users List
             </h3>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    {["Name", "Email", "Status"].map((header) => (
+                    {["Name", "Email", "Reason for Report"].map((header) => (
                       <th
                         key={header}
                         className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
@@ -250,7 +197,7 @@ export default function AdminDashboard() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {users.map((user, index) => (
+                  {reportedUsers.map((user, index) => (
                     <motion.tr
                       key={user.id}
                       className="hover:bg-indigo-50 cursor-pointer transition-colors duration-150"
@@ -265,16 +212,8 @@ export default function AdminDashboard() {
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {user.email}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm">
-                        <span
-                          className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                            user.verifiedByAdmin
-                              ? "bg-green-100 text-green-800"
-                              : "bg-yellow-100 text-yellow-800"
-                          }`}
-                        >
-                          {user.verifiedByAdmin ? "Active" : "Pending"}
-                        </span>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {user.reportReason || "Not specified"}
                       </td>
                     </motion.tr>
                   ))}
@@ -329,7 +268,7 @@ export default function AdminDashboard() {
                   transition={{ delay: 0.3, duration: 0.5 }}
                 >
                   <h3 className="text-3xl font-bold text-white">
-                    {selectedUser.name}'s Profile
+                    {selectedUser.name}'s Profile (Reported)
                   </h3>
                 </motion.div>
                 <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-white opacity-10 rounded-full"></div>
@@ -356,21 +295,6 @@ export default function AdminDashboard() {
                       label="Sex"
                       value={selectedUser.sex}
                     />
-                    <InfoItem
-                      icon={<FaUser />}
-                      label="Date of Birth"
-                      value={selectedUser.dateOfBirth}
-                    />
-                    <InfoItem
-                      icon={<FaUser />}
-                      label="Mother Tongue"
-                      value={selectedUser.motherTongue}
-                    />
-                    <InfoItem
-                      icon={<FaUser />}
-                      label="Religion"
-                      value={selectedUser.religion}
-                    />
                   </div>
                   <div className="space-y-4">
                     <h4 className="text-xl font-semibold text-gray-700 dark:text-gray-300">
@@ -386,11 +310,6 @@ export default function AdminDashboard() {
                       label="Phone"
                       value={selectedUser.number}
                     />
-                    <InfoItem
-                      icon={<FaMapMarkerAlt />}
-                      label="Address"
-                      value={selectedUser.address}
-                    />
                   </div>
                 </motion.div>
 
@@ -401,67 +320,17 @@ export default function AdminDashboard() {
                   className="space-y-4"
                 >
                   <h4 className="text-xl font-semibold text-gray-700 dark:text-gray-300">
-                    Professional Information
+                    Report Information
                   </h4>
                   <InfoItem
-                    icon={<FaBriefcase />}
-                    label="Profession"
-                    value={selectedUser.profession}
+                    icon={<FaUser />}
+                    label="Reason for Report"
+                    value={selectedUser.reportReason || "Not specified"}
                   />
-                  <InfoItem
-                    icon={<FaBriefcase />}
-                    label="Employment Status"
-                    value={selectedUser.employmentStatus}
-                  />
-                  <InfoItem
-                    icon={<FaDollarSign />}
-                    label="Salary"
-                    value={selectedUser.salary}
-                  />
-                </motion.div>
-
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.6, duration: 0.5 }}
-                  className="space-y-4"
-                >
-                  <h4 className="text-xl font-semibold text-gray-700 dark:text-gray-300">
-                    Description
-                  </h4>
-                  <p className="text-gray-600 dark:text-gray-400">
-                    {selectedUser.description}
-                  </p>
                 </motion.div>
               </div>
 
               <div className="bg-gray-50 dark:bg-gray-700 px-8 py-6 space-y-6">
-                <motion.div
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 0.7, duration: 0.5 }}
-                >
-                  <h4 className="text-xl font-semibold text-gray-700 dark:text-gray-300 mb-4">
-                    Photos
-                  </h4>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                    {selectedUser.photos.map((photoUrl, index) => (
-                      <motion.div
-                        key={index}
-                        whileHover={{ scale: 1.05 }}
-                        whileTap={{ scale: 0.95 }}
-                        className="relative group"
-                      >
-                        <img
-                          src={photoUrl}
-                          alt={`User photo ${index + 1}`}
-                          className="w-full h-40 object-cover rounded-lg shadow-md transition duration-300 ease-in-out"
-                        />
-                      </motion.div>
-                    ))}
-                  </div>
-                </motion.div>
-
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -473,26 +342,14 @@ export default function AdminDashboard() {
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
-                    onClick={() => setIsConfirmationOpen(true)}
-                    className={`px-6 py-3 rounded-full text-white font-semibold transition-all duration-300 ${
-                      selectedUser.verifiedByAdmin
-                        ? "bg-green-500 cursor-not-allowed"
-                        : "bg-blue-500 hover:bg-blue-600"
-                    }`}
-                    disabled={selectedUser.verifiedByAdmin}
+                    onClick={handleClearReport}
+                    className="px-6 py-3 rounded-full text-white font-semibold transition-all duration-300 bg-green-500 hover:bg-green-600"
                   >
-                    {selectedUser.verifiedByAdmin ? "Verified" : "Verify User"}
+                    Clear Report
                   </motion.button>
                 </motion.div>
               </div>
             </motion.div>
-
-            {isConfirmationOpen && selectedUser && (
-              <ConfirmationModal
-                onConfirm={handleVerify}
-                onCancel={() => setIsConfirmationOpen(false)}
-              />
-            )}
           </motion.div>
         </div>
       )}
