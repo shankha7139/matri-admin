@@ -1,11 +1,17 @@
 import React, { useState, useEffect } from "react";
-import { collection, getDocs } from "firebase/firestore";
+import {
+  collection,
+  getDocs,
+  getDoc,
+  doc,
+  updateDoc,
+  arrayRemove,
+} from "firebase/firestore";
 import { db, storage } from "../firebase";
 import { useAuth } from "../AuthContext";
 import { useNavigate } from "react-router-dom";
 import { Bar, Line, Doughnut } from "react-chartjs-2";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
-import { getDownloadURL, ref, listAll } from "firebase/storage";
+import { getDownloadURL, ref, listAll, deleteObject } from "firebase/storage";
 import { motion } from "framer-motion";
 import {
   FaUser,
@@ -14,6 +20,7 @@ import {
   FaMapMarkerAlt,
   FaBriefcase,
   FaDollarSign,
+  FaTrash,
 } from "react-icons/fa";
 
 export default function AdminDashboard() {
@@ -78,6 +85,32 @@ export default function AdminDashboard() {
       setIsModalOpen(true);
     }
     console.log("selected user -------", selectedUser, userId, userSnap.data());
+  };
+
+  const handleDeletePhoto = async (photoUrl) => {
+    if (selectedUser && selectedUser.uid) {
+      try {
+        // Remove the photo URL from the user's photos array in Firestore
+        const userRef = doc(db, "users", selectedUser.uid);
+        await updateDoc(userRef, {
+          photos: arrayRemove(photoUrl),
+        });
+
+        // Delete the photo from Firebase Storage
+        const photoRef = ref(storage, photoUrl);
+        await deleteObject(photoRef);
+
+        // Update the local state
+        setSelectedUser((prevState) => ({
+          ...prevState,
+          photos: prevState.photos.filter((url) => url !== photoUrl),
+        }));
+
+        console.log("Photo deleted successfully");
+      } catch (error) {
+        console.error("Error deleting photo:", error);
+      }
+    }
   };
 
   const closeModal = () => {
@@ -457,6 +490,14 @@ export default function AdminDashboard() {
                           alt={`User photo ${index + 1}`}
                           className="w-full h-40 object-cover rounded-lg shadow-md transition duration-300 ease-in-out"
                         />
+                        <motion.button
+                          whileHover={{ scale: 1.1 }}
+                          whileTap={{ scale: 0.9 }}
+                          onClick={() => handleDeletePhoto(photoUrl)}
+                          className="absolute top-2 right-2 bg-red-500 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                        >
+                          <FaTrash />
+                        </motion.button>
                       </motion.div>
                     ))}
                   </div>
