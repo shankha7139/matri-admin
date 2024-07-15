@@ -5,14 +5,7 @@ import { useAuth } from "../AuthContext";
 import { useNavigate } from "react-router-dom";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
 import { motion } from "framer-motion";
-import {
-  FaUser,
-  FaEnvelope,
-  FaPhone,
-  FaMapMarkerAlt,
-  FaBriefcase,
-  FaDollarSign,
-} from "react-icons/fa";
+import { FaUser, FaEnvelope, FaPhone } from "react-icons/fa";
 
 export default function Report() {
   const [reportedUsers, setReportedUsers] = useState([]);
@@ -62,9 +55,10 @@ export default function Report() {
         const userRef = doc(db, "users", selectedUser.uid);
         await updateDoc(userRef, {
           reported: false,
+          reportReason: [],
         });
 
-        setSelectedUser({ ...selectedUser, reported: false });
+        setSelectedUser({ ...selectedUser, reported: false, reportReason: [] });
         setReportedUsers(
           reportedUsers.filter((user) => user.id !== selectedUser.uid)
         );
@@ -213,7 +207,9 @@ export default function Report() {
                         {user.email}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {user.reportReason || "Not specified"}
+                        {user.reportReason && user.reportReason.length > 0
+                          ? user.reportReason.join(", ")
+                          : "Not specified"}
                       </td>
                     </motion.tr>
                   ))}
@@ -325,12 +321,17 @@ export default function Report() {
                   <InfoItem
                     icon={<FaUser />}
                     label="Reason for Report"
-                    value={selectedUser.reportReason || "Not specified"}
+                    value={
+                      selectedUser.reportReason &&
+                      selectedUser.reportReason.length > 0
+                        ? selectedUser.reportReason.join(", ")
+                        : "Not specified"
+                    }
                   />
                 </motion.div>
               </div>
 
-              <div className="bg-gray-50 dark:bg-gray-700 px-8 py-6 space-y-6">
+              <div className="bg-gray-50 dark:bg-gray-700 px-8 py-6 space-y-6 flex justify-center text-center items-center ">
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}

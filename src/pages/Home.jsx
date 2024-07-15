@@ -81,7 +81,6 @@ export default function AdminDashboard() {
         console.log("Updating selectedUser:", userSnap.data());
         return userSnap.data();
       });
-      //   fetchUserPhotos(userId);
       setIsModalOpen(true);
     }
     console.log("selected user -------", selectedUser, userId, userSnap.data());
@@ -90,22 +89,18 @@ export default function AdminDashboard() {
   const handleDeletePhoto = async (photoUrl) => {
     if (selectedUser && selectedUser.uid) {
       try {
-        // Remove the photo URL from the user's photos array in Firestore
         const userRef = doc(db, "users", selectedUser.uid);
         await updateDoc(userRef, {
           photos: arrayRemove(photoUrl),
         });
 
-        // Delete the photo from Firebase Storage
         const photoRef = ref(storage, photoUrl);
         await deleteObject(photoRef);
 
-        // Update the local state
         setSelectedUser((prevState) => ({
           ...prevState,
           photos: prevState.photos.filter((url) => url !== photoUrl),
         }));
-
         console.log("Photo deleted successfully");
       } catch (error) {
         console.error("Error deleting photo:", error);
@@ -468,7 +463,7 @@ export default function AdminDashboard() {
                 </motion.div>
               </div>
 
-              <div className="bg-gray-50 dark:bg-gray-700 px-8 py-6 space-y-6">
+              <div className="bg-gray-50 dark:bg-gray-700 px-8 py-6 space-y-6 justify-center text-center items-center ">
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
