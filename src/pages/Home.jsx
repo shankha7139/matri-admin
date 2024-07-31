@@ -6,6 +6,8 @@ import {
   doc,
   updateDoc,
   arrayRemove,
+  query,
+  orderBy,
 } from "firebase/firestore";
 import { db, storage } from "../firebase";
 import { useAuth } from "../AuthContext";
@@ -36,10 +38,15 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     const fetchUsers = async () => {
-      const querySnapshot = await getDocs(collection(db, "users"));
+      const usersQuery = query(
+        collection(db, "users"),
+        orderBy("createdAt", "desc")
+      );
+      const querySnapshot = await getDocs(usersQuery);
       const userData = querySnapshot.docs.map((doc) => ({
         id: doc.id,
         ...doc.data(),
+        createdAt: doc.data().createdAt?.toDate(),
       }));
       setUsers(userData);
     };
@@ -53,10 +60,8 @@ export default function AdminDashboard() {
   };
 
   const handleVerify = async () => {
-    console.log("in the function", selectedUser);
     if (selectedUser && selectedUser.uid) {
       try {
-        console.log("in here");
         const userRef = doc(db, "users", selectedUser.uid);
         await updateDoc(userRef, {
           verifiedByAdmin: true,
@@ -64,8 +69,6 @@ export default function AdminDashboard() {
 
         setSelectedUser({ ...selectedUser, verifiedByAdmin: true });
         setIsConfirmationOpen(false);
-        console.log("in here user", selectedUser);
-        // You might want to update the users list here as well
       } catch (error) {
         console.error("Error verifying user:", error);
       }
@@ -77,13 +80,9 @@ export default function AdminDashboard() {
     const userSnap = await getDoc(userRef);
 
     if (userSnap.exists()) {
-      setSelectedUser((prevState) => {
-        console.log("Updating selectedUser:", userSnap.data());
-        return userSnap.data();
-      });
+      setSelectedUser({ ...userSnap.data(), id: userSnap.id });
       setIsModalOpen(true);
     }
-    console.log("selected user -------", selectedUser, userId, userSnap.data());
   };
 
   const handleDeletePhoto = async (photoUrl) => {
@@ -224,9 +223,18 @@ export default function AdminDashboard() {
               className="block py-2 px-4 rounded-lg text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 transition-colors duration-200"
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}
+              onClick={() => navigate("/agents")}
+            >
+              ALL Agents
+            </motion.a>
+            <motion.a
+              href="#"
+              className="block py-2 px-4 rounded-lg text-gray-700 hover:bg-indigo-50 hover:text-indigo-600 transition-colors duration-200"
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
               onClick={() => navigate("/reportedusers")}
             >
-              setings
+              Settings
             </motion.a>
             <motion.button
               onClick={handleLogout}
@@ -267,7 +275,7 @@ export default function AdminDashboard() {
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
-                    {["Name", "Email", "Status"].map((header) => (
+                    {["Name", "Email", "Status", "Created At"].map((header) => (
                       <th
                         key={header}
                         className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider"
@@ -303,6 +311,9 @@ export default function AdminDashboard() {
                         >
                           {user.verifiedByAdmin ? "Active" : "Pending"}
                         </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {user.createdAt?.toLocaleString() || "N/A"}
                       </td>
                     </motion.tr>
                   ))}
@@ -362,7 +373,6 @@ export default function AdminDashboard() {
                 </motion.div>
                 <div className="absolute -bottom-10 -right-10 w-40 h-40 bg-white opacity-10 rounded-full"></div>
               </div>
-
               <div className="px-8 py-6 space-y-6">
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
